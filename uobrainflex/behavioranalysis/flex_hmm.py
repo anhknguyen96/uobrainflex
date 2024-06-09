@@ -116,7 +116,7 @@ def format_choice_behavior_hmm(trial_data, trial_labels, drop_no_response=False,
     
     ## this only works on target trials!! This should be created during labview data collection in the future
     # create true_choice array. 
-    true_choice = np.full([len(trials),1],np.int(2)) 
+    true_choice = np.full([len(trials),1],np.int64(2))
     # step through each response and update true_choice
     for ind in range(len(trials)):
         # if hit and left stim
@@ -397,7 +397,7 @@ def get_pupils_from_hmm_trials(hmm_trials):
 def get_true_choices_from_hmm_trials(hmm_trials):
     true_choices=list([])
     for session in hmm_trials:
-        these_choices = np.full([len(session),1],np.int(2)) 
+        these_choices = np.full([len(session),1],np.int64(2))
         these_choices[:,0] = session['choice'].values
         true_choices.append(these_choices)
     return true_choices
@@ -428,7 +428,7 @@ def set_hmm_trials_choices(hmm_trials):
 def get_true_choices_from_outcomes_hmm_trials(hmm_trials):
     true_choices=list([])
     for session in hmm_trials:
-        these_choices = np.full([len(session),1],np.int(2)) 
+        these_choices = np.full([len(session),1],np.int64(2))
         outcomes = session['outcome'].values
         inpts = session['inpt'].values
         for i, outcome in enumerate(outcomes):

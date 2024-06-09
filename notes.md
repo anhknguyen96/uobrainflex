@@ -1,0 +1,1 @@
+changed np.int to np.int64 in numpy/__init__.py and flex_hmm.py

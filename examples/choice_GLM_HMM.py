@@ -4,19 +4,24 @@ Created on Fri Oct 29 12:58:29 2021
 
 @author: Daniel Hulsey
 
-Example utilizing uobrainflex packages to fit GLM_HMM model to behavioral sessions
+Example utilizing uobrainflex_test packages to fit GLM_HMM model to behavioral sessions
 """
 
 import os
-from uobrainflex.utils import djconnect
-from uobrainflex.pipeline import subject as subjectSchema
-from uobrainflex.pipeline import acquisition as acquisitionSchema
-from uobrainflex.pipeline import experimenter as experimenterSchema
+# from uobrainflex.utils import djconnect
+# from uobrainflex.pipeline import subject as subjectSchema
+# from uobrainflex.pipeline import acquisition as acquisitionSchema
+# from uobrainflex.pipeline import experimenter as experimenterSchema
 from uobrainflex.nwb import loadbehavior as load
 from uobrainflex.behavioranalysis import flex_hmm
+from pathlib import Path
+from uobrainflex import config
+import re
+import pandas as pd
+
 
 # specify existing directory to save summary figures to. 
-save_folder = '' # if save_folder == '', plots will be generated but not saved
+save_folder = 'save_plot' # if save_folder == '', plots will be generated but not saved
 if save_folder !='':
     line_folder = save_folder + 'line summaries\\'
     patch_folder = save_folder + 'patch summaries\\'
@@ -28,25 +33,31 @@ else:
     line_folder = save_folder
     patch_folder = save_folder
 
-# import behavior session database from datajoint. 
-djSubject = subjectSchema.Subject()
-djExperimenter = experimenterSchema.Experimenter()
-djBehaviorSession = acquisitionSchema.BehaviorSession()
-all_sessions = djBehaviorSession.fetch(format='frame')
+# # import behavior session database from datajoint.
+# djSubject = subjectSchema.Subject()
+# djExperimenter = experimenterSchema.Experimenter()
+# djBehaviorSession = acquisitionSchema.BehaviorSession()
+# all_sessions = djBehaviorSession.fetch(format='frame')
 
 # filter sessions as desired, this could also include a minimum hits/choices per session
-subject = 'BW031'
-training_stage = ['S5','S6']
+dataDir = config['BEHAVIOR']['nwb_data_path']
+subject = 'BW051'
+training_stage = ['S5']
 min_choices = 100
-hmm_sessions = all_sessions.query("subject_id==@subject and behavior_training_stage==@training_stage and choices_total>@min_choices")
+# hmm_sessions = all_sessions.query("subject_id==@subject and behavior_training_stage==@training_stage and choices_total>@min_choices")
 
 # get nwbfilepaths
-nwbfilepaths = []
-for fileID in hmm_sessions.index:                                               #instead of using DJ to find fileIDs, fileID could be a range of dates
-    this_session = load.get_file_path(subject,str(fileID[6:]))
-    if this_session:
-        nwbfilepaths.append(this_session)
-        
+# nwbfilepaths = []
+# for fileID in hmm_sessions.index:                                               #instead of using DJ to find fileIDs, fileID could be a range of dates
+#     this_session = load.get_file_path(subject,str(fileID[6:]))
+#     if this_session:
+#         nwbfilepaths.append(this_session)
+target_folder = os.path.join(dataDir,subject)
+nwbfilepaths = list(Path(target_folder).rglob('*.nwb'))
+df = pd.DataFrame(nwbfilepaths,columns=['nwbfile_path'])
+df['session'] = df['nwbfile_path'].apply(lambda row: re.split("[-.]",row.name)[-2])
+hmm_sessions = df['session'].unique()
+
 # nwbfilepaths = nwbfilepaths[-20:] # truncate sessions used for this example
 ## fitting GLM-HMM from list of filepaths`
 # load and format data. Getting behavior measures will significantly slow this down.
@@ -58,7 +69,7 @@ inpts, true_choices, hmm_trials = flex_hmm.compile_choice_hmm_data(nwbfilepaths,
 num_states = 4
 hmm = flex_hmm.choice_hmm_fit(subject, num_states, inpts, true_choices)
 # include model outpit in trial data structures
-posterior_probs, hmm_trials = flex_hmm.get_posterior_probs(hmm, true_choices, inpts, hmm_trials, occ_thresh = 0.8)
+posterior_probs, hmm_trials = flex_hmm.get_posterior_probs(hmm, hmm_trials, occ_thresh = 0.8)
 
 # permute states to match standard and remap hmm_trials
 # flex_hmm.permute_hmm(hmm,hmm_trials)
