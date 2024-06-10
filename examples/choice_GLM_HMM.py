@@ -21,12 +21,12 @@ import pandas as pd
 
 
 # specify existing directory to save summary figures to. 
-save_folder = 'save_plot' # if save_folder == '', plots will be generated but not saved
+save_folder = '' # if save_folder == '', plots will be generated but not saved
 if save_folder !='':
-    line_folder = save_folder + 'line summaries\\'
-    patch_folder = save_folder + 'patch summaries\\'
+    line_folder = save_folder + 'line_summaries/'
+    patch_folder = save_folder + 'patch_summaries/'
     
-    os.mkdir(save_folder)
+    # os.mkdir(save_folder)
     os.mkdir(line_folder)
     os.mkdir(patch_folder)
 else:
