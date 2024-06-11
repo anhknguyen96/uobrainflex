@@ -54,8 +54,8 @@ def MLE_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpt
     test_ll = hmm.log_probability(test_choices,test_inpts)/np.concatenate(test_inpts).shape[0]
     return hmm, train_ll, test_ll
 
-base_folder = input("Enter the main directory path") + '\\'
-hmm_trials_paths = glob.glob(base_folder + 'hmm_trials\\' + '*hmm_trials.npy')
+base_folder = input("Enter the main directory path") + '/'
+hmm_trials_paths = glob.glob(base_folder + '*hmm_trials.npy')
 
 max_states = 7
 nKfold = 5
@@ -78,15 +78,15 @@ for m in range(1,len(hmm_trials_paths)): # for each subject
     states=[]
     init=[]
     
-    #load previously created hmm_trials variable
-    mouse_path = hmm_trials_paths[m]
-    print('mouse ' + str(m+1) + ' of ' + str(len(hmm_trials_paths)))
-    subject = os.path.basename(mouse_path)[:5]
-    hmm_trials = np.load(mouse_path,allow_pickle=True) 
-    
-    #get inputs and true choices from hmm_trials varaible
-    inpts = flex_hmm.get_inpts_from_hmm_trials(hmm_trials)
-    true_choices = flex_hmm.get_true_choices_from_hmm_trials(hmm_trials)
+    # #load previously created hmm_trials variable
+    # mouse_path = hmm_trials_paths[m]
+    # print('mouse ' + str(m+1) + ' of ' + str(len(hmm_trials_paths)))
+    # subject = os.path.basename(mouse_path)[:5]
+    # hmm_trials = np.load(mouse_path,allow_pickle=True)
+    #
+    # #get inputs and true choices from hmm_trials varaible
+    # inpts = flex_hmm.get_inpts_from_hmm_trials(hmm_trials)
+    # true_choices = flex_hmm.get_true_choices_from_hmm_trials(hmm_trials)
     
     kf = KFold(n_splits=nKfold, shuffle=True, random_state=None)
     #Just for sanity's sake, let's check how it splits the data
@@ -130,12 +130,12 @@ for m in range(1,len(hmm_trials_paths)): # for each subject
 
     
     file_id = round(time.time())
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_hmms_' + str(file_id),MLE_HMM)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_test_LL_' + str(file_id),MLE_test_LL)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_train_LL_' + str(file_id),MLE_train_LL)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MLE_hmms_' + str(file_id),MLE_HMM)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MLE_test_LL_' + str(file_id),MLE_test_LL)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MLE_train_LL_' + str(file_id),MLE_train_LL)
     
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_hmms_' + str(file_id),MAP_HMM)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_test_LL_' + str(file_id),MAP_test_LL)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_train_LL_' + str(file_id),MAP_train_LL)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MAP_hmms_' + str(file_id),MAP_HMM)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MAP_test_LL_' + str(file_id),MAP_test_LL)
+    np.save(base_folder + 'n_states/' + subject + '_state_testing_MAP_train_LL_' + str(file_id),MAP_train_LL)
 
 

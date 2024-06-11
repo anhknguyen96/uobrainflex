@@ -8,7 +8,8 @@ from sklearn.model_selection import KFold
 import time
 import ssm
 import ray
-
+from pathlib import Path
+import pandas as pd
 @ray.remote
 def MAP_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpts, test_choices):
     ## Fit GLM-HMM with MAP estimation:
@@ -54,14 +55,23 @@ def MLE_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpt
     test_ll = hmm.log_probability(test_choices,test_inpts)/np.concatenate(test_inpts).shape[0]
     return hmm, train_ll, test_ll
 
-base_folder = input("Enter the main directory path") + '\\'
-hmm_trials_paths = glob.glob(base_folder + 'hmm_trials\\' + '*hmm_trials.npy')
+analysis_folder_name = input("Enter the main directory path")
+csv_file_to_analyze = input("Enter csv file to analyze")
+root_data_dir = Path(os.getcwd()) / 'data'
+analysis_result_name = Path(analysis_folder_name) / 'results'
+data_path = root_data_dir / csv_file_to_analyze
+
+data = pd.read_csv(data_path)
+mouse_id_lst = data.mouse_id.unique()
 
 max_states = 7
 nKfold = 5
 initializations = 10
-
-for m in range(1,len(hmm_trials_paths)): # for each subject
+col_inpts = ['freq_trans','prev_choice']
+col_choices = ['lick_side_freq']
+## variables explained
+# inpts/true_choices: list of arrays that belong signifies sessions within a mouse
+for m in range(1,len(mouse_id_lst)): # for each subject
     #build blank variabiles to fill
     MAP_train_LL= np.full([initializations,max_states,nKfold],np.nan)
     MAP_test_LL= np.full([initializations,max_states,nKfold],np.nan)
@@ -79,14 +89,18 @@ for m in range(1,len(hmm_trials_paths)): # for each subject
     init=[]
     
     #load previously created hmm_trials variable
-    mouse_path = hmm_trials_paths[m]
-    print('mouse ' + str(m+1) + ' of ' + str(len(hmm_trials_paths)))
-    subject = os.path.basename(mouse_path)[:5]
-    hmm_trials = np.load(mouse_path,allow_pickle=True) 
-    
+    print('mouse ' + str(mouse_id_lst[m]))
+    subject = str(mouse_id_lst[m])
+
     #get inputs and true choices from hmm_trials varaible
-    inpts = flex_hmm.get_inpts_from_hmm_trials(hmm_trials)
-    true_choices = flex_hmm.get_true_choices_from_hmm_trials(hmm_trials)
+    # inpts = flex_hmm.get_inpts_from_hmm_trials(hmm_trials)
+    # true_choices = flex_hmm.get_true_choices_from_hmm_trials(hmm_trials)
+    inpts = list([])
+    true_choices = list([])
+    sess_iden = data.loc[data.mouse_id==mouse_id_lst[m]]
+    for sess_index in range(len(sess_iden)):
+        true_choices = true_choices.extend(data.loc[data.session_identifier==sess_iden[sess_index],col_choices])
+        inpts = inpts.extend(data.loc[data.session_identifier == sess_iden[sess_index], col_inpts])
     
     kf = KFold(n_splits=nKfold, shuffle=True, random_state=None)
     #Just for sanity's sake, let's check how it splits the data
@@ -130,12 +144,12 @@ for m in range(1,len(hmm_trials_paths)): # for each subject
 
     
     file_id = round(time.time())
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_hmms_' + str(file_id),MLE_HMM)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_test_LL_' + str(file_id),MLE_test_LL)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MLE_train_LL_' + str(file_id),MLE_train_LL)
-    
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_hmms_' + str(file_id),MAP_HMM)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_test_LL_' + str(file_id),MAP_test_LL)
-    np.save(base_folder + 'n_states\\' + subject + '_state_testing_MAP_train_LL_' + str(file_id),MAP_train_LL)
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_hmms_' + str(file_id),MLE_HMM)
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_test_LL_' + str(file_id),MLE_test_LL)
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_train_LL_' + str(file_id),MLE_train_LL)
+
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_hmms_' + str(file_id),MAP_HMM)
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_test_LL_' + str(file_id),MAP_test_LL)
+    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_train_LL_' + str(file_id),MAP_train_LL)
 
 

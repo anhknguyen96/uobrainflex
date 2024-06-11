@@ -18,7 +18,7 @@ from pathlib import Path
 from uobrainflex import config
 import re
 import pandas as pd
-
+import numpy as np
 
 # specify existing directory to save summary figures to. 
 save_folder = '' # if save_folder == '', plots will be generated but not saved
@@ -62,6 +62,7 @@ hmm_sessions = df['session'].unique()
 ## fitting GLM-HMM from list of filepaths`
 # load and format data. Getting behavior measures will significantly slow this down.
 inpts, true_choices, hmm_trials = flex_hmm.compile_choice_hmm_data(nwbfilepaths, get_behavior_measures = True)
+# np.save(os.path.jopin(target_folder,subject+'_hmm_trials.npy'),hmm_trials)
 
 ## generate glm-hmm model
 # model fitting to determine number of states takes a while -- not shown here
