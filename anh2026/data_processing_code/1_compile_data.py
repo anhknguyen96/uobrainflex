@@ -11,5 +11,7 @@ for mouse_path in mouse_paths:
     
     #generate intermediate .npy file with relevant data from nwb files for each session. These "hmm_trial" files will be used extensively
     inpts, true_choices, hmm_trials = flex_hmm.compile_choice_hmm_data(nwbfilepaths, get_behavior_measures = True)
-    np.save(p.joinpath(mouse_path.name+'_hmm_trials.npy'),hmm_trials)
+    # hmm_trials has to be converted to numpy array before being saved
+    hmm_trials_ = np.asarray(hmm_trials, dtype='object')
+    np.save(p.joinpath(mouse_path.name+'_hmm_trials.npy'),hmm_trials_)
     

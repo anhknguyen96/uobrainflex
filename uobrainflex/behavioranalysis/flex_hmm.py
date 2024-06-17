@@ -446,10 +446,12 @@ def get_true_choices_from_outcomes_hmm_trials(hmm_trials):
     return true_choices
 
 def get_psychos(hmm_trials):  
-    all_trials = pd.DataFrame()
-    for trials in hmm_trials:
-        all_trials = all_trials.append(trials)
-    
+    # this seems to mean that they want to merge multiple df, do this instead
+    all_trials = pd.concat(hmm_trials).reset_index(drop=True)
+    # all_trials = pd.DataFrame()
+    # for trials in hmm_trials:
+    #     all_trials = all_trials.append(trials)
+
     psycho = np.full((int(np.unique(all_trials['hmm_state'].dropna()).max()+1),3,len(np.unique(all_trials['inpt']))),np.nan)
     for state in np.unique(all_trials['hmm_state'].dropna()):
         for ind, choice in enumerate(np.unique(all_trials['choice'])):
