@@ -92,6 +92,9 @@ csv_file_to_analyze = "om_all_batch1&2&3&4_rawrows.csv"
 root_data_dir = Path(analysis_folder_name) / 'data'
 analysis_result_name = Path(analysis_folder_name) / 'results'
 data_path = root_data_dir / csv_file_to_analyze
+save_dir = analysis_result_name / 'n_states'
+if not os.path.exists(save_dir):
+    os.makedirs(save_dir)
 
 data = pd.read_csv(data_path)
 mouse_id_lst = data.mouse_id.unique()
@@ -101,6 +104,7 @@ nKfold = 5
 initializations = 10
 col_inpts = ['freq_trans']
 col_choices = ['lick_side_freq']
+
 
 ## variables explained
 # inpts/true_choices: list of arrays that belong signifies sessions within a mouse
@@ -177,12 +181,12 @@ for m in range(1,len(mouse_id_lst)): # for each subject
 
     
     file_id = round(time.time())
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_hmms_' + str(file_id),MLE_HMM)
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_test_LL_' + str(file_id),MLE_test_LL)
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MLE_train_LL_' + str(file_id),MLE_train_LL)
+    np.save(save_dir / (subject + '_state_testing_MLE_hmms_' + str(file_id)),MLE_HMM)
+    np.save(save_dir / (subject + '_state_testing_MLE_test_LL_' + str(file_id)),MLE_test_LL)
+    np.save(save_dir / (subject + '_state_testing_MLE_train_LL_' + str(file_id)),MLE_train_LL)
 
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_hmms_' + str(file_id),MAP_HMM)
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_test_LL_' + str(file_id),MAP_test_LL)
-    np.save(analysis_result_name / 'n_states' / subject + '_state_testing_MAP_train_LL_' + str(file_id),MAP_train_LL)
+    np.save(save_dir / (subject + '_state_testing_MAP_hmms_' + str(file_id)),MAP_HMM)
+    np.save(save_dir / (subject + '_state_testing_MAP_test_LL_' + str(file_id)),MAP_test_LL)
+    np.save(save_dir / (subject + '_state_testing_MAP_train_LL_' + str(file_id)),MAP_train_LL)
 
 

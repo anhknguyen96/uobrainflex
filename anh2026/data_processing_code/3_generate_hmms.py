@@ -73,6 +73,11 @@ csv_file_to_analyze = "om_all_batch1&2&3&4_rawrows.csv"
 root_data_dir = Path(analysis_folder_name) / 'data'
 analysis_result_name = Path(analysis_folder_name) / 'results'
 data_path = root_data_dir / csv_file_to_analyze
+hmm_trials_save = analysis_result_name / 'hmm_trials'
+hmm_save = analysis_result_name / 'hmms'
+if not os.path.exists(hmm_trials_save):
+    os.makedirs(hmm_trials_save)
+    os.makedirs(hmm_save)
 
 data = pd.read_csv(data_path)
 mouse_id_lst = data.mouse_id.unique()
@@ -118,5 +123,5 @@ for m in range(len(mouse_id_lst)):
     probs,hmm_trials = flex_hmm.get_posterior_probs(hmm, hmm_trials)
     hmm = flex_hmm.permute_hmm(hmm, hmm_trials)
     probs,hmm_trials = flex_hmm.get_posterior_probs(hmm, hmm_trials, occ_thresh = .8)
-    np.save(analysis_result_name / 'hmm_trials' /  subject + '_hmm_trials.npy',hmm_trials)
-    np.save(analysis_result_name / 'hmms' / subject + '_hmm.npy',hmm)
+    np.save(hmm_trials_save / (subject + '_hmm_trials.npy'),hmm_trials)
+    np.save(hmm_save / (subject + '_hmm.npy'),hmm)
