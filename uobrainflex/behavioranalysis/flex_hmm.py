@@ -364,6 +364,38 @@ def get_posterior_probs(hmm, hmm_trials, occ_thresh = .8):
 
     return posterior_probs, hmm_trials
 
+def get_posterior_probs_om(hmm, hmm_trials, inpts, true_choices, occ_thresh=.8):
+    # pass true data to the model and get state occupancy probabilities
+    posterior_probs = [hmm.expected_states(data=data, input=inpt)[0]
+                       for data, inpt
+                       in zip(true_choices, inpts)]
+
+    # update hmm_trials with state probabilities
+    for sess_ind in range(len(hmm_trials)):
+
+        columns = hmm_trials[sess_ind].columns
+        del_cols = []
+        for col in columns:
+            if col[:6] == 'state_':
+                del_cols.append(col)
+
+        # hmm_trials[sess_ind].drop[del_cols[0]]
+        # test = hmm_trials[sess_ind]
+        hmm_trials[sess_ind].drop(del_cols, axis=1, inplace=True)
+
+        hmm_trials[sess_ind]['inpt'] = inpts[sess_ind][:, 0]
+        hmm_trials[sess_ind]['choice'] = true_choices[sess_ind]
+        session_posterior_prob = posterior_probs[sess_ind]
+        np.max(session_posterior_prob, axis=1)
+        trial_max_prob = np.max(session_posterior_prob, axis=1)
+        trial_state = np.argmax(session_posterior_prob, axis=1).astype(float)
+        trial_state[np.where(trial_max_prob < occ_thresh)[0]] = np.nan
+        hmm_trials[sess_ind]['hmm_state'] = trial_state
+        for state in range(session_posterior_prob.shape[1]):
+            hmm_trials[sess_ind]['state_' + str(state + 1) + '_prob'] = session_posterior_prob[:, state]
+
+    return posterior_probs, hmm_trials
+
 def get_posterior_probs_from_hmm_trials(hmm_trials):   
     posterior_probs=[]
     #update hmm_trials with state probabilities
@@ -445,12 +477,10 @@ def get_true_choices_from_outcomes_hmm_trials(hmm_trials):
         true_choices.append(these_choices)
     return true_choices
 
-def get_psychos(hmm_trials):  
-    # this seems to mean that they want to merge multiple df, do this instead
-    all_trials = pd.concat(hmm_trials).reset_index(drop=True)
-    # all_trials = pd.DataFrame()
-    # for trials in hmm_trials:
-    #     all_trials = all_trials.append(trials)
+def get_psychos(hmm_trials):
+    all_trials = pd.DataFrame()
+    for trials in hmm_trials:
+        all_trials = all_trials.append(trials)
 
     psycho = np.full((int(np.unique(all_trials['hmm_state'].dropna()).max()+1),3,len(np.unique(all_trials['inpt']))),np.nan)
     for state in np.unique(all_trials['hmm_state'].dropna()):
@@ -461,7 +491,23 @@ def get_psychos(hmm_trials):
                     psycho[int(state),ind,ind2]=len(all_trials.query("choice==@choice and hmm_state==@state and inpt==@this_inpt"))/state_trials
     
     xvals = np.unique(all_trials['inpt'])
-    return psycho, xvals   
+    return psycho, xvals
+def get_psychos_om(hmm_trials):
+    # this seems to mean that they want to merge multiple df, do this instead
+    all_trials = pd.concat(hmm_trials).reset_index(drop=True)
+
+    psycho = np.full(
+        (int(np.unique(all_trials['hmm_state'].dropna()).max() + 1), len(np.unique(all_trials['lick_side_freq'])), len(np.unique(all_trials['binned_freq']))), np.nan)
+    for state in np.unique(all_trials['hmm_state'].dropna()):
+        for ind, choice in enumerate(np.unique(all_trials['lick_side_freq'])):
+            for ind2, this_inpt in enumerate(np.unique(all_trials['binned_freq'])):
+                state_trials = len(all_trials.query("hmm_state==@state and binned_freq==@this_inpt"))
+                if state_trials > 0:
+                    psycho[int(state), ind, ind2] = len(
+                        all_trials.query("lick_side_freq==@choice and hmm_state==@state and binned_freq==@this_inpt")) / state_trials
+
+    xvals = np.unique(all_trials['binned_freq'])
+    return psycho, xvals
 
 def get_trials_psychos(all_trials):
     l=[]
@@ -598,7 +644,48 @@ def permute_hmm(hmm, hmm_trials):
         
     hmm.permute(perm)
     
-    return hmm      
+    return hmm
+
+
+def permute_hmm_om(hmm, hmm_trials):
+    psycho, _ = get_psychos_om(hmm_trials)
+
+    # perfect_psychos = np.zeros((3,psycho.shape[1],psycho.shape[2]))
+    # perfect_psychos[0,0,:int(perfect_psychos.shape[2]/2)]=1
+    # perfect_psychos[0,1,int(perfect_psychos.shape[2]/2):]=1
+    # perfect_psychos[1,0,:]=1
+    # perfect_psychos[2,1,:]=1
+    # # perfect_psychos[3,2,:]=1
+
+    perfect_psychos = np.zeros((2, psycho.shape[1], psycho.shape[2]))
+    perfect_psychos[0, 0, :int(perfect_psychos.shape[2] / 2)] = 1
+    perfect_psychos[0, 1, int(perfect_psychos.shape[2] / 2):] = 1
+    # perfect_psychos[1, 2, :] = 1
+
+    # if np.isnan(psycho).any():
+    #     del_ind = np.unique(np.where(np.isnan(psycho))[2])
+    #     psycho = np.delete(psycho,del_ind,axis=2)
+    similarity = compare_psychos(perfect_psychos, psycho)
+    state_similarity = np.nanargmin(similarity, axis=0)
+
+    if len(state_similarity) < psycho.shape[0]:
+        extra_states = np.delete(np.arange(psycho.shape[0]), state_similarity)
+        state_similarity = np.append(state_similarity, extra_states)
+
+    if len(np.unique(state_similarity)) != len(state_similarity):
+        best_psycho_ind = np.nanargmin(similarity[:, 0])
+        state_options = np.arange(similarity.shape[0])
+        state_options = np.delete(state_options, best_psycho_ind)
+        state_similarity = np.concatenate((np.full(1, best_psycho_ind), state_options))
+
+    perm = state_similarity
+    # if len(perm)<len(similarity):
+    #     missing_state = list(set(np.array(range(similarity.shape[0])))- set(perm))
+    #     perm = np.append(perm,missing_state)
+
+    hmm.permute(perm)
+
+    return hmm
 
 def plot_GLM_weights(subject, hmm,save_folder=''):
        ## plot results

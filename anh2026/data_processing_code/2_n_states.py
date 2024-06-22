@@ -12,33 +12,18 @@ from pathlib import Path
 import pandas as pd
 
 # from ashwood. hhm from ssm inpts are list of lists
-def partition_data_by_session(inpt, y, session):
-    '''
-    Partition inpt, y, mask by session
-    :param inpt: arr of size TxM
-    :param y:  arr of size T x D
-    :param mask: Boolean arr of size T indicating if element is violation or
-    not
-    :param session: list of size T containing session ids
-    :return: list of inpt arrays, data arrays and mask arrays, where the
-    number of elements in list = number of sessions and each array size is
-    number of trials in session
-    '''
-    inputs = []
-    datas = []
-    indexes = np.unique(session, return_index=True)[1]
-    unique_sessions = [session[index] for index in sorted(indexes)]
-    counter = 0
-    # masks = []
-    for sess in unique_sessions:
-        idx = np.where(session == sess)[0]
-        counter += len(idx)
-        inputs.append(inpt[idx, :])
-        datas.append(y[idx, :])
-        # masks.append(mask[idx, :])
-    assert counter == inpt.shape[0], "not all trials assigned to session!"
-    return inputs, datas
+def get_inpts_and_choices(hmm_trials,col_inpts,col_choices):
+    inpts=list([])
+    true_choices = list([])
+    for session in hmm_trials:
+        stim = session[col_inpts].values
+        these_inpts = [ np.vstack((stim,np.ones(len(stim)))).T ]
+        inpts.extend(these_inpts)
 
+        choices = session[col_choices].values
+        these_choices = [np.vstack((choices, np.ones(len(choices)))).T]
+        true_choices.extend(these_choices)
+    return inpts, true_choices
 
 @ray.remote
 def MAP_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpts, test_choices):
@@ -85,30 +70,24 @@ def MLE_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpt
     test_ll = hmm.log_probability(test_choices,test_inpts)/np.concatenate(test_inpts).shape[0]
     return hmm, train_ll, test_ll
 
-# analysis_folder_name = input("Enter the main directory path")
-# csv_file_to_analyze = input("Enter csv file to analyze")
 analysis_folder_name = "/home/anh/Documents/uobrainflex_test/anh2026"
-csv_file_to_analyze = "om_all_batch1&2&3&4_rawrows.csv"
-root_data_dir = Path(analysis_folder_name) / 'data'
 analysis_result_name = Path(analysis_folder_name) / 'results'
-data_path = root_data_dir / csv_file_to_analyze
+hmm_path = analysis_result_name / 'hmm_trials'
 save_dir = analysis_result_name / 'n_states'
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 
-data = pd.read_csv(data_path)
-mouse_id_lst = data.mouse_id.unique()
+hmm_trials_paths = glob.glob(str(hmm_path) + '/' + '*hmm_trials.npy')
 
 max_states = 7
 nKfold = 5
 initializations = 10
-col_inpts = ['freq_trans']
+col_inpts = ['z_freq_trans']
 col_choices = ['lick_side_freq']
-
 
 ## variables explained
 # inpts/true_choices: list of arrays that belong signifies sessions within a mouse
-for m in range(1,len(mouse_id_lst)): # for each subject
+for m in range(1,len(hmm_trials_paths)): # for each subject
     #build blank variabiles to fill
     MAP_train_LL= np.full([initializations,max_states,nKfold],np.nan)
     MAP_test_LL= np.full([initializations,max_states,nKfold],np.nan)
@@ -124,21 +103,16 @@ for m in range(1,len(mouse_id_lst)): # for each subject
     fold=[]
     states=[]
     init=[]
-    
-    #load previously created hmm_trials variable
-    print('mouse ' + str(mouse_id_lst[m]))
-    subject = str(mouse_id_lst[m])
 
-    #get inputs and true choices from hmm_trials varaible
-    # inpts = flex_hmm.get_inpts_from_hmm_trials(hmm_trials)
-    # true_choices = flex_hmm.get_true_choices_from_hmm_trials(hmm_trials)
-    data_sub = data.loc[(data.mouse_id==mouse_id_lst[m])&(data.lick_side_freq!=-2)].reset_index()
-    data_sub.freq_trans = (data_sub.freq_trans - np.mean(data_sub.freq_trans)) / np.std(data_sub.freq_trans)
-    session_arr = data_sub.session_identifier.to_numpy()
-    inpt_arr = data_sub[col_inpts].to_numpy()
-    choice_arr = data_sub[col_choices].to_numpy()
-    inpts, true_choices = partition_data_by_session(inpt_arr,choice_arr,session_arr)
-    
+    #load previously created hmm_trials variable
+    mouse_path = hmm_trials_paths[m]
+    print('mouse ' + str(m+1) + ' of ' + str(len(hmm_trials_paths)))
+    subject = os.path.basename(mouse_path)[:4]
+    hmm_trials = np.load(mouse_path,allow_pickle=True)
+
+    # #get inputs and true choices from hmm_trials varaible
+    inpts, true_choices = get_inpts_and_choices(hmm_trials,col_inpts,col_choices)
+
     kf = KFold(n_splits=nKfold, shuffle=True, random_state=None)
     #Just for sanity's sake, let's check how it splits the data
     for ii, (train_index, test_index) in enumerate(kf.split(true_choices)):
@@ -176,9 +150,6 @@ for m in range(1,len(mouse_id_lst)): # for each subject
         MLE_HMM[init[i],states[i]-1,fold[i]] = MLE_results[i,0]
         MLE_train_LL[init[i],states[i]-1,fold[i]] = MLE_results[i,1]
         MLE_test_LL[init[i],states[i]-1,fold[i]] = MLE_results[i,2]
-        
-    
-
     
     file_id = round(time.time())
     np.save(save_dir / (subject + '_state_testing_MLE_hmms_' + str(file_id)),MLE_HMM)
