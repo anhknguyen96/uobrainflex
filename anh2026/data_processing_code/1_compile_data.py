@@ -4,6 +4,14 @@ from pathlib import Path
 import os
 import pandas as pd
 import scipy
+
+def load_data(animal_file):
+    container = np.load(animal_file, allow_pickle=True)
+    data = [container[key] for key in container]
+    inpt = data[0]
+    y = data[1]
+    session = data[2]
+    return inpt, y, session
 def partition_data_by_session(inpt, y, session,data_sub):
     '''
     Partition inpt, y, mask by session
@@ -34,53 +42,45 @@ def partition_data_by_session(inpt, y, session,data_sub):
     return inputs, datas, hmm_trials
 
 analysis_folder_name = "/home/anh/Documents/uobrainflex_test/anh2026"
-csv_file_to_analyze = "om_all_batch1&2&3&4_rawrows.csv"
+csv_file_to_analyze = "om_all_batch1&2&3&4_processed.csv"
+processed_file_toload = 'all_animals_concat.npz'
 
 root_data_dir = Path(analysis_folder_name) / 'data'
 analysis_result_name = Path(analysis_folder_name) / 'results'
 data_path = root_data_dir / csv_file_to_analyze
+processed_data_path = root_data_dir / processed_file_toload
 hmm_trials_save = analysis_result_name / 'hmm_trials'
 if not os.path.exists(hmm_trials_save):
     os.makedirs(hmm_trials_save)
 
+# get processed dataframe
 om = pd.read_csv(data_path)
-# clean data
-data_batch12 = om.loc[(om.mouse_id < 13) & (om.lick_side_freq != -2) & (om.prev_choice != -2) & (om.prev_reward_prob == 0.5) & (om.prev_choice2 != -2)]
-data_batch34 = om.loc[(om.mouse_id > 13) & (om.prev_om_gen == 0) & (om.lick_side_freq != -2) & (om.prev_choice != -2) & (om.prev_reward_prob == 0.5) & (om.prev_choice2 != -2)]
-om_cleaned = pd.concat[(data_batch12,data_batch34)].reset_index()
-# now take care of predictors
-index = om_cleaned.index
-om_cleaned['prev_failure'] = om_cleaned['prev_failure'].astype('int')
-om_cleaned['mouse_id'] = om_cleaned['mouse_id'].astype(str)
-om_cleaned['z_freq_trans'] = om_cleaned['freq_trans'].copy()
-om_cleaned['z_prev_choice'] = om_cleaned['prev_choice'].copy()
-for session_no in om_cleaned.session_identifier.unique():
-    # get indices of trials in the session
-    session_no_index = list(index[(om_cleaned['session_no'] == session_no)])
-    # z score predictors on a session basis
-    om_cleaned.loc[session_no_index, 'z_freq_trans'] = scipy.stats.zscore(
-        om_cleaned.loc[session_no_index, 'freq_trans'])
-    om_cleaned.loc[session_no_index, 'z_prev_choice'] = scipy.stats.zscore(
-        om_cleaned.loc[session_no_index, 'prev_choice'])
-
 # since min/max freq_trans is -1.5/1.5
 bin_lst = np.arange(-1.55,1.6,0.1)
 bin_name=np.round(np.arange(-1.5,1.6,.1),2)
 # get binned freqs for psychometrics
-om_cleaned["binned_freq"] = pd.cut(om_cleaned.freq_trans, bins=bin_lst, labels= [str(x) for x in bin_name], include_lowest=True)
+om["binned_freq"] = pd.cut(om.freq_trans, bins=bin_lst, labels= [str(x) for x in bin_name], include_lowest=True)
 
-col_inpts = ['z_freq_trans']
+# get processed predictors
+col_inpts = ['pfail','stim', 'stim:pfail', 'pchoice']
 col_choices = ['lick_side_freq']
-mouse_id_lst = om_cleaned.mouse_id.unique()
+# trial info cols
+col_toparse = ['binned_freq','lick_side_freq','mouse_id','session_identifier']
+inpt, y, session = load_data(processed_data_path)
+df_tmp = pd.DataFrame(data=inpt, columns=col_inpts)
+
+# concatenated the trial info dataframe and the predictors dataframe
+hmm_df = pd.concat([df_tmp,om[col_toparse]],axis=1)
+mouse_id_lst = hmm_df.mouse_id.unique()
 for m in range(len(mouse_id_lst)):
     print('mouse ' + str(mouse_id_lst[m]))
     subject = str(mouse_id_lst[m])
 
-    data_sub = om_cleaned.loc[(om_cleaned.mouse_id == mouse_id_lst[m])].reset_index()
+    data_sub = hmm_df.loc[(hmm_df.mouse_id == mouse_id_lst[m])].reset_index()
     session_arr = data_sub.session_identifier.to_numpy()
     inpt_arr = data_sub[col_inpts].to_numpy()
     choice_arr = data_sub[col_choices].to_numpy()
-    _, _, hmm_trials = partition_data_by_session(inpt_arr, choice_arr, session_arr)
+    _, _, hmm_trials = partition_data_by_session(inpt_arr, choice_arr, session_arr,data_sub)
 
     # hmm_trials has to be converted to numpy array before being saved
     hmm_trials = np.asarray(hmm_trials, dtype='object')

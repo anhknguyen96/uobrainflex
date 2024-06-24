@@ -82,7 +82,7 @@ hmm_trials_paths = glob.glob(str(hmm_path) + '/' + '*hmm_trials.npy')
 max_states = 7
 nKfold = 5
 initializations = 10
-col_inpts = ['z_freq_trans']
+col_inpts = ['pfail','stim', 'stim:pfail', 'pchoice']
 col_choices = ['lick_side_freq']
 
 ## variables explained

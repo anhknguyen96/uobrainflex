@@ -57,7 +57,7 @@ if not os.path.exists(hmm_save):
 
 hmm_trials_paths = glob.glob(str(hmm_path) + '/' + '*hmm_trials.npy')
 
-col_inpts = ['z_freq_trans']
+col_inpts = ['pfail','stim', 'stim:pfail', 'pchoice']
 col_choices = ['lick_side_freq']
 
 for m in range(len(hmm_trials_paths)):
