@@ -17,12 +17,12 @@ def get_inpts_and_choices(hmm_trials,col_inpts,col_choices):
     true_choices = list([])
     for session in hmm_trials:
         stim = session[col_inpts].values
-        these_inpts = [ np.vstack((stim,np.ones(len(stim)))).T ]
+        # add constant bias
+        these_inpts = [np.hstack((stim,np.array([np.ones(len(stim))]).T))]
         inpts.extend(these_inpts)
 
         choices = session[col_choices].values
-        these_choices = [np.vstack((choices, np.ones(len(choices)))).T]
-        true_choices.extend(these_choices)
+        true_choices.extend([choices])
     return inpts, true_choices
 
 @ray.remote
@@ -57,7 +57,7 @@ def MLE_hmm_fit(subject, num_states, training_inpts, training_choices, test_inpt
     # Set the parameters of the GLM-HMM
     obs_dim = training_choices[0].shape[1]          # number of observed dimensions
     num_categories = len(np.unique(np.concatenate(training_choices)))    # number of categories for output
-    input_dim = inpts[0].shape[1]                                    # input dimensions
+    input_dim = training_inpts[0].shape[1]                                    # input dimensions
 
     TOL = 10**-4
     N_iters = 1000
@@ -87,7 +87,7 @@ col_choices = ['lick_side_freq']
 
 ## variables explained
 # inpts/true_choices: list of arrays that belong signifies sessions within a mouse
-for m in range(1,len(hmm_trials_paths)): # for each subject
+for m in range(len(hmm_trials_paths)): # for each subject
     #build blank variabiles to fill
     MAP_train_LL= np.full([initializations,max_states,nKfold],np.nan)
     MAP_test_LL= np.full([initializations,max_states,nKfold],np.nan)

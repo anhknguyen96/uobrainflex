@@ -15,14 +15,13 @@ def get_inpts_and_choices(hmm_trials,col_inpts,col_choices):
     true_choices = list([])
     for session in hmm_trials:
         stim = session[col_inpts].values
-        these_inpts = [ np.vstack((stim,np.ones(len(stim)))).T ]
+        # add constant bias
+        these_inpts = [ np.hstack((stim,np.array([np.ones(len(stim))]).T)) ]
         inpts.extend(these_inpts)
 
         choices = session[col_choices].values
-        these_choices = [np.vstack((choices, np.ones(len(choices)))).T]
-        true_choices.extend(these_choices)
+        true_choices.extend([choices])
     return inpts, true_choices
-
 def plateu(data,threshold=.001):
     ind = np.where(np.diff(data)>threshold)[0]
     ind[np.argmax(data[ind+1])]
@@ -67,10 +66,10 @@ for m in range(len(hmm_trials_paths)):
     #load previously calculated log likelihoods across # states to determine number of states for this subject
     LL= np.load(glob.glob(str(analysis_result_name / 'n_states')+'/'+subject+'*MLE_test*')[0])
     # average across folds, and take the best iteration of fitting for each # of states
-    LL = LL.mean(axis=-1).max(axis=0) 
+    LL = LL.mean(axis=-1).max(axis=0)
     # find plateu of state x LL function to determine n_states
     num_states = plateu(LL)+1
-    
+
     # load hmm_trials variable and get trial inputs and choices
     hmm_trials = np.load(hmm_trials_paths[m],allow_pickle= True)
     inpts, true_choices = get_inpts_and_choices(hmm_trials,col_inpts,col_choices)
@@ -81,12 +80,12 @@ for m in range(len(hmm_trials_paths)):
     # fit 10 hmms and select best
     for z in range(10):
         processes.append(MLE_hmm_fit.remote(subject, int(num_states), inpts, true_choices))
-        
+
     data = np.array([ray.get(p) for p in processes])
-   
+
     # select HMM with highest log likelihood
     hmm = data[np.argmax(data[:,1]),0]
-    
+
     # input posterior probabilities to hmm_trials, and permute the hmm to match states across subjects
     probs,hmm_trials = flex_hmm.get_posterior_probs_om(hmm, hmm_trials,inpts,true_choices)
     hmm = flex_hmm.permute_hmm_om(hmm, hmm_trials)
